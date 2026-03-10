@@ -54,7 +54,7 @@ async def create_admin(
     user = await user_manager.create(user_create)
 
     # Build preferences dict
-    prefs = {"currency_display": body.currency, "language": body.language}
+    prefs = {"currency_display": body.currency, "language": body.language, "onboarding_completed": False}
     if body.name:
         prefs["display_name"] = body.name
 

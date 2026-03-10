@@ -55,6 +55,7 @@ export default function SetupPage() {
     setIsLoading(true)
     try {
       const { access_token } = await setup.createAdmin(email, password, currency, name, currentLang)
+      localStorage.removeItem('onboarding_completed')
       loginWithToken(access_token)
       navigate('/')
     } catch {
