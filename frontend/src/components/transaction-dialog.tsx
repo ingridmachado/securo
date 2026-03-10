@@ -1,0 +1,331 @@
+import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { DatePickerInput } from '@/components/ui/date-picker-input'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import type { Transaction, RecurringTransaction } from '@/types'
+
+export function extractApiError(error: unknown): string {
+  if (
+    error &&
+    typeof error === 'object' &&
+    'response' in error &&
+    error.response &&
+    typeof error.response === 'object' &&
+    'data' in error.response
+  ) {
+    const data = (error.response as { data: unknown }).data
+    if (data && typeof data === 'object' && 'detail' in data) {
+      const detail = (data as { detail: unknown }).detail
+      if (typeof detail === 'string') return detail
+      if (Array.isArray(detail)) {
+        return detail.map((d: { msg?: string; loc?: string[] }) => {
+          const field = d.loc?.slice(-1)[0] ?? ''
+          return `${field}: ${d.msg ?? 'inválido'}`
+        }).join(', ')
+      }
+    }
+  }
+  return 'Ocorreu um erro inesperado'
+}
+
+export function TransactionDialog({
+  open,
+  onClose,
+  transaction,
+  categories,
+  accounts,
+  recurringMatch,
+  onSave,
+  onDelete,
+  loading,
+  error,
+  isSynced = false,
+}: {
+  open: boolean
+  onClose: () => void
+  transaction: Transaction | null
+  categories: { id: string; name: string; icon: string }[]
+  accounts: { id: string; name: string }[]
+  recurringMatch?: RecurringTransaction
+  onSave: (data: Partial<Transaction>, recurringData?: { frequency: string; end_date?: string }) => void
+  onDelete?: () => void
+  loading: boolean
+  error: string | null
+  isSynced?: boolean
+}) {
+  const { t } = useTranslation()
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>
+            {transaction ? t('common.edit') : t('transactions.addManual')}
+          </DialogTitle>
+        </DialogHeader>
+        <TransactionForm
+          key={transaction?.id ?? 'new'}
+          transaction={transaction}
+          categories={categories}
+          accounts={accounts}
+          recurringMatch={recurringMatch}
+          onSave={onSave}
+          onDelete={onDelete}
+          onCancel={onClose}
+          loading={loading}
+          error={error}
+          isSynced={isSynced}
+        />
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function TransactionForm({
+  transaction,
+  categories,
+  accounts,
+  recurringMatch,
+  onSave,
+  onDelete,
+  onCancel,
+  loading,
+  error,
+  isSynced,
+}: {
+  transaction: Transaction | null
+  categories: { id: string; name: string; icon: string }[]
+  accounts: { id: string; name: string }[]
+  recurringMatch?: RecurringTransaction
+  onSave: (data: Partial<Transaction>, recurringData?: { frequency: string; end_date?: string }) => void
+  onDelete?: () => void
+  onCancel: () => void
+  loading: boolean
+  error: string | null
+  isSynced: boolean
+}) {
+  const { t, i18n } = useTranslation()
+  const locale = i18n.language === 'en' ? 'en-US' : i18n.language
+  const [description, setDescription] = useState(transaction?.description ?? '')
+  const [amount, setAmount] = useState(transaction?.amount?.toString() ?? '')
+  const [date, setDate] = useState(transaction?.date ?? new Date().toISOString().split('T')[0])
+  const [type, setType] = useState<'debit' | 'credit'>(transaction?.type ?? 'debit')
+  const [currency, setCurrency] = useState(transaction?.currency ?? 'BRL')
+  const [categoryId, setCategoryId] = useState(transaction?.category_id ?? '')
+  const [accountId, setAccountId] = useState(transaction?.account_id ?? accounts[0]?.id ?? '')
+  const [notes, setNotes] = useState(transaction?.notes ?? '')
+  const [isRecurring, setIsRecurring] = useState(false)
+  const [frequency, setFrequency] = useState<'monthly' | 'weekly' | 'yearly'>('monthly')
+  const [endDate, setEndDate] = useState('')
+  const isCreating = !transaction
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        const txData = isSynced
+          ? {
+              category_id: categoryId || undefined,
+              notes: notes.trim() || undefined,
+            } as Partial<Transaction>
+          : {
+              description,
+              amount: parseFloat(amount),
+              date,
+              type,
+              currency,
+              category_id: categoryId || undefined,
+              account_id: accountId || undefined,
+              notes: notes.trim() || undefined,
+            } as Partial<Transaction>
+        const recurringData = isCreating && isRecurring
+          ? { frequency, end_date: endDate || undefined }
+          : undefined
+        onSave(txData, recurringData)
+      }}
+      className="space-y-4"
+    >
+      {error && (
+        <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
+          {error}
+        </div>
+      )}
+      {isSynced && (
+        <div className="flex items-center gap-2 p-3 text-sm bg-amber-50 border border-amber-200 rounded-md text-amber-700">
+          {t('transactions.syncedInfo')}
+        </div>
+      )}
+      {recurringMatch && (
+        <div className="flex items-center gap-2 p-3 text-sm bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">
+          <span>{t('transactions.recurringInfo', {
+            frequency: t(`recurring.${recurringMatch.frequency}`),
+            next: new Date(recurringMatch.next_occurrence).toLocaleDateString(locale),
+          })}</span>
+        </div>
+      )}
+      <div className="space-y-2">
+        <Label>{t('transactions.description')}</Label>
+        <Input
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          required
+          disabled={isSynced}
+        />
+        {isSynced && transaction?.payee && transaction.payee !== transaction.description && (
+          <p className="text-xs text-muted-foreground">{transaction.payee}</p>
+        )}
+      </div>
+      <div className="grid grid-cols-3 gap-4">
+        <div className="space-y-2">
+          <Label>{t('transactions.amount')}</Label>
+          <Input
+            type="number"
+            step="0.01"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+            disabled={isSynced}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Moeda</Label>
+          <select
+            className="w-full border border-border rounded-md px-3 py-2 text-sm bg-background h-9 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-ring/30 focus-visible:ring-[2px]"
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value)}
+            disabled={isSynced}
+          >
+            <option value="BRL">BRL (R$)</option>
+          </select>
+        </div>
+        <div className="space-y-2">
+          <Label>{t('transactions.date')}</Label>
+          <DatePickerInput
+            value={date}
+            onChange={setDate}
+            disabled={isSynced}
+            className="w-full justify-start"
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Tipo</Label>
+          <select
+            className="w-full border border-border rounded-md px-3 py-2 text-sm bg-background disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-ring/30 focus-visible:ring-[2px]"
+            value={type}
+            onChange={(e) => setType(e.target.value as 'debit' | 'credit')}
+            disabled={isSynced}
+          >
+            <option value="debit">Despesa</option>
+            <option value="credit">Receita</option>
+          </select>
+        </div>
+        <div className="space-y-2">
+          <Label>{t('transactions.category')}</Label>
+          <select
+            className="w-full border border-border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus-visible:ring-ring/30 focus-visible:ring-[2px]"
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
+          >
+            <option value="">{t('transactions.noCategory')}</option>
+            {categories.map((cat) => (
+              <option key={cat.id} value={cat.id}>{cat.name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+      {!isSynced && (
+        <div className="space-y-2">
+          <Label>{t('transactions.account')}</Label>
+          <select
+            className="w-full border border-border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus-visible:ring-ring/30 focus-visible:ring-[2px]"
+            value={accountId}
+            onChange={(e) => setAccountId(e.target.value)}
+            required
+          >
+            {accounts.map((acc) => (
+              <option key={acc.id} value={acc.id}>{acc.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        <Label>Notas <span className="text-muted-foreground font-normal text-xs">(opcional — use #tags para categorizar)</span></Label>
+        <textarea
+          className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0"
+          rows={2}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Ex: jantar de negócios #work #reimbursable"
+        />
+      </div>
+
+      {/* Recurring toggle — only shown when creating non-synced */}
+      {isCreating && !isSynced && (
+        <div className="space-y-3 border rounded-md p-3">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isRecurring}
+              onChange={(e) => setIsRecurring(e.target.checked)}
+              className="rounded border-gray-300"
+            />
+            <span className="text-sm font-medium">{t('transactions.makeRecurring')}</span>
+          </label>
+          {isRecurring && (
+            <div className="grid grid-cols-2 gap-4 pt-1">
+              <div className="space-y-2">
+                <Label>{t('recurring.frequency')}</Label>
+                <select
+                  className="w-full border border-border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus-visible:ring-ring/30 focus-visible:ring-[2px]"
+                  value={frequency}
+                  onChange={(e) => setFrequency(e.target.value as 'monthly' | 'weekly' | 'yearly')}
+                >
+                  <option value="monthly">{t('recurring.monthly')}</option>
+                  <option value="weekly">{t('recurring.weekly')}</option>
+                  <option value="yearly">{t('recurring.yearly')}</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>{t('recurring.endDate')}</Label>
+                <DatePickerInput
+                  value={endDate}
+                  onChange={setEndDate}
+                  placeholder={t('recurring.endDate')}
+                  className="w-full justify-start"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <DialogFooter className={onDelete ? 'flex justify-between sm:justify-between' : ''}>
+        {onDelete && (
+          <Button type="button" variant="destructive" onClick={onDelete} disabled={loading}>
+            {t('common.delete')}
+          </Button>
+        )}
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" onClick={onCancel}>
+            {t('common.cancel')}
+          </Button>
+          <Button type="submit" disabled={loading}>
+            {loading ? t('common.loading') : t('common.save')}
+          </Button>
+        </div>
+      </DialogFooter>
+    </form>
+  )
+}

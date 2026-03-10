@@ -1,0 +1,223 @@
+export interface User {
+  id: string
+  email: string
+  preferences: UserPreferences
+}
+
+export interface UserPreferences {
+  language?: string
+  date_format?: string
+  timezone?: string
+  currency_display?: string
+  display_name?: string
+  onboarding_completed?: boolean
+}
+
+export interface Category {
+  id: string
+  user_id: string
+  group_id: string | null
+  name: string
+  icon: string
+  color: string
+  is_system: boolean
+}
+
+export interface CategoryGroup {
+  id: string
+  user_id: string
+  name: string
+  icon: string
+  color: string
+  position: number
+  is_system: boolean
+  categories: Category[]
+}
+
+export interface BankConnection {
+  id: string
+  user_id: string
+  provider: string
+  institution_name: string
+  external_id: string
+  status: string
+  settings: ConnectionSettings | null
+  last_sync_at: string | null
+  created_at: string
+}
+
+export interface ConnectionSettings {
+  payee_source?: 'auto' | 'merchant' | 'payment_data' | 'description' | 'none'
+  import_pending?: boolean
+}
+
+export interface Account {
+  id: string
+  user_id: string
+  connection_id: string | null
+  external_id: string | null
+  name: string
+  type: string
+  balance: number
+  current_balance: number
+  previous_balance: number | null
+  currency: string
+  is_closed: boolean
+  closed_at: string | null
+}
+
+export interface AccountSummary {
+  account_id: string
+  current_balance: number
+  monthly_income: number
+  monthly_expenses: number
+}
+
+export interface Transaction {
+  id: string
+  user_id: string
+  account_id: string | null
+  category_id: string | null
+  category: Category | null
+  external_id: string | null
+  description: string
+  amount: number
+  currency: string
+  date: string
+  type: 'debit' | 'credit'
+  source: string
+  status: 'posted' | 'pending'
+  payee: string | null
+  notes: string | null
+  transfer_pair_id: string | null
+}
+
+export interface RuleCondition {
+  field: string
+  op: string
+  value: string | number
+}
+
+export interface RuleAction {
+  op: string
+  value: string
+}
+
+export interface Rule {
+  id: string
+  user_id: string
+  name: string
+  conditions_op: 'and' | 'or'
+  conditions: RuleCondition[]
+  actions: RuleAction[]
+  priority: number
+  is_active: boolean
+}
+
+export interface ImportLog {
+  id: string
+  user_id: string
+  account_id: string
+  account_name: string | null
+  filename: string
+  format: string
+  transaction_count: number
+  total_credit: number
+  total_debit: number
+  created_at: string
+}
+
+export interface RecurringTransaction {
+  id: string
+  user_id: string
+  account_id: string | null
+  category_id: string | null
+  description: string
+  amount: number
+  currency: string
+  type: 'debit' | 'credit'
+  frequency: 'monthly' | 'weekly' | 'yearly'
+  day_of_month: number | null
+  start_date: string
+  end_date: string | null
+  is_active: boolean
+  next_occurrence: string
+}
+
+export interface ProjectedTransaction {
+  recurring_id: string
+  description: string
+  amount: number
+  currency: string
+  type: 'debit' | 'credit'
+  date: string
+  category_id: string | null
+  category_name: string | null
+  category_icon: string | null
+  category_color: string | null
+}
+
+export interface DashboardSummary {
+  total_balance: Record<string, number>
+  balance_date: string
+  monthly_income: number
+  monthly_expenses: number
+  accounts_count: number
+  pending_categorization: number
+  pending_categorization_amount: number
+}
+
+export interface SpendingByCategory {
+  category_id: string | null
+  category_name: string
+  category_icon: string
+  category_color: string
+  total: number
+  percentage: number
+}
+
+export interface MonthlyTrend {
+  month: string
+  income: number
+  expenses: number
+}
+
+export interface DailyBalance {
+  day: number
+  balance: number | null
+}
+
+export interface BalanceHistory {
+  current: DailyBalance[]
+  previous: DailyBalance[]
+}
+
+export interface Budget {
+  id: string
+  user_id: string
+  category_id: string
+  amount: number
+  month: string
+  is_recurring: boolean
+}
+
+export interface BudgetVsActual {
+  category_id: string
+  category_name: string
+  category_icon: string
+  category_color: string
+  group_id: string | null
+  group_name: string | null
+  budget_amount: number | null
+  actual_amount: number
+  prev_month_amount: number
+  percentage_used: number | null
+  is_recurring: boolean
+}
+
+export interface PaginatedResponse<T> {
+  items: T[]
+  total: number
+  page: number
+  limit: number
+}

@@ -1,0 +1,5 @@
+.env
+.worktrees/
+.DS_Store
+.playwright-mcp/
+docs/plans/
