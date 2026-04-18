@@ -735,7 +735,7 @@
     "noIconsFound": "Nenhum ícone encontrado",
     "primaryCurrency": "Moeda Principal",
     "showLess":"Mostrar menos",
-    "showMore": "+{{count}} item"
+    "showMore": "Mostrar +{{count}}"
   },
   "privacy": {
     "hide": "Ocultar valores",
